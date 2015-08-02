@@ -1,5 +1,6 @@
 # To get the number of occurrence of each word in a pdf file
 import sys
+import os
 from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
 from pdfminer.pdfpage import PDFPage
 from pdfminer.converter import TextConverter
@@ -47,29 +48,91 @@ def toString(pages_text):
 def extractWord(string):
 	raw = string.decode('utf-8')
 	tokens = word_tokenize(raw)
-	words = nltk.Text(tokens)
-	return tokens
+	words = []
+	for x in range(len(tokens)):
+		if (tokens[x].endswith('-')): words.append(tokens[x][:-1] + tokens[x+1])
+		else: words.append(tokens[x])
+	return words
 
-def main(argv):
-	# Assign the PDF path
-	path = argv[1];
-
-	# Extract text of the PDF file
-	pages_text = extractPagesString(path)
-
+def stem(words):
+	stemmedWords = []
 	# Initiate stem tools
 	st = LancasterStemmer()
-	
-	# Convert to string
-	pdfStr = toString(pages_text)
-	pdfStr = str.lower(pdfStr)
-
-	# Split words
-	words = extractWord(pdfStr)
 	for word in words:
-		word = st.stem(word)
-		print(word)
+		stemmedWords.append(st.stem(word))
+	return stemmedWords
 
+def getUniqueCount(symbols):
+	D = {}
+	for symbol in symbols:
+		if (symbol in D.keys()): D[symbol] += 1
+		else: D[symbol] = 1
+	return D
+
+def mergeDictionaries(dic1_org, dic2_org, mode='union'):
+	dic1 = dic1_org.copy()
+	dic2 = dic2_org.copy()
+	if str.lower(mode) == 'intersection':
+		for key in dic1.keys():
+			if not (key in dic2.keys()): del dic1[key]
+		for key in dic2.keys():
+			if not (key in dic1.keys()): del dic2[key]
+	else:
+		for key in dic1.keys():
+			if not (key in dic2.keys()): dic2[key] = 0
+		for key in dic2.keys():
+			if not (key in dic1.keys()): dic1[key] = 0
+
+
+	dic = {}
+	for key in dic2.keys():
+		dic[key] = dic1[key] + dic2[key]
+	return dic
+
+def main(argv):
+
+	# Testing Code
+	# d1 = {'apple': 2, 'bird': 3, 'cat': 4, 'dog': 5}
+	# d2 = {'cat': 2, 'dog': 3, 'egg': 4, 'fish': 5}
+	# d3_union = mergeDictionaries(d1, d2, mode='union')
+	# d3_intsec = mergeDictionaries(d1, d2, mode='intersection')
+	# print('Union results:')
+	# for key in d3_union.keys():
+	# 	print(key + ": " + str(d3_union[key]))
+	# print('Intersection results:')
+	# for key in d3_intsec.keys():
+	# 	print(key + ": " + str(d3_intsec[key]))
+	# sys.exit(0)
+
+	dictionary = {}
+	for x in range(len(argv)-1):
+		files = []
+		if argv[x+1].endswith('.pdf'): files.append(argv[x+1])
+		else:
+			files = [f for f in os.listdir(argv[x+1]) if f.endswith('.pdf')]
+			for i in range(len(files)):
+				files[i] = argv[x+1] + files[i]
+
+		for path in files:
+			# Print log
+			print('Processing ' + path + '...')
+
+			# Extract text of the PDF file
+			pages_text = extractPagesString(path)
+	
+			# Convert to string
+			pdfStr = toString(pages_text)
+			pdfStr = str.lower(pdfStr)
+
+			# Split words
+			# if len(dictionary.keys()) == 0: mode = 'union'
+			# else: mode = 'intersection'
+			mode = 'union'
+			dictionary = mergeDictionaries( getUniqueCount( stem( extractWord(pdfStr) ) ), dictionary, mode=mode )
+
+	for key in dictionary.keys():
+		print(key + ": " + str(dictionary[key]))
+		
 	sys.exit(1)
 
 if __name__ == '__main__': sys.exit(main(sys.argv))
