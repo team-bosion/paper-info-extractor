@@ -57,15 +57,9 @@ def main(argv):
 	# Extract text of the PDF file
 	pages_text = extractPagesString(path)
 
-	# Print out the result
-	for x in range(len(pages_text)):
-		continue
-		print('--------------------------------------------------')
-		print('Page[' + str(x) + ']:')
-		print(pages_text[x])
-		print('--------------------------------------------------')
-
+	# Initiate stem tools
 	st = LancasterStemmer()
+	
 	# Convert to string
 	pdfStr = toString(pages_text)
 	pdfStr = str.lower(pdfStr)
