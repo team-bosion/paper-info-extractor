@@ -10,6 +10,51 @@ import nltk
 from nltk import word_tokenize
 from nltk.stem.lancaster import LancasterStemmer
 
+from xml.dom import minidom
+
+import numpy as np
+
+class PaperPageInfo(object):
+
+	def __init__(self, page_xml_obj):
+		self.xmlObj = page_xml_obj
+		if 'bbox' in page_xml_obj.attributes.keys():
+			pointsValues = page_xml_obj.attributes['bbox'].value.split(',')
+			boxSize = np.array([ float(pointsValues[2]), float(pointsValues[3]) ]) - np.array([ float(pointsValues[0]), float(pointsValues[1]) ])
+			self.width = boxSize[0]
+			self.height = boxSize[1]
+		return
+
+	def getWidth(self):
+		return self.width
+
+	def getHeight(self):
+		return self.height
+
+	def getSize(self):
+		return np.array([self.width, self.height])
+
+	def getXMLObject(self):
+		return self.xmlObj
+
+
+
+def getXmlObjects(stringArray):
+	xmlObjArray = []
+	for string in stringArray:
+		xmlObjArray.append(getXmlObject(string))
+	return xmlObjArray
+
+def getXmlObject(string):
+	return minidom.parseString(string)
+
+def getPages(source):
+	page = source.getElementsByTagName('page')
+	return page
+
+def testpath():
+	return './test-samples/OpticalMusicRecognition/Overview_of_Algorithms_and_Techniques_for_Optical_Music_Recognition.pdf'
+
 def extractPages(pdfPath, format='txt'):
 	fp = file(pdfPath, 'rb')
 	rsrcmgr = PDFResourceManager()
