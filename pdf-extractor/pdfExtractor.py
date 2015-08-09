@@ -14,32 +14,148 @@ from xml.dom import minidom
 
 import numpy as np
 
-class PaperPageInfo(object):
+
+'''
+	Box:
+		which has the properties 'width' and 'height'.
+'''
+class Box(object):
+
+	def __init__(self, width, height, center=np.array([0, 0]), objId=-1):
+		self.id = objId
+		self.width = width
+		self.height = height
+		self.center = center
+
+	def getWidth(self): return self.width
+
+	def getHeight(self): return self.height
+
+	def getBoxCenter(self): return self.center
+
+	def getId(self): return self.id
+
+	def getBoxSize(self): return np.array([self.getWidth(), self.getHeight()])
+
+	@staticmethod
+	def calBoxSize(xml_obj):
+		if 'bbox' in xml_obj.attributes.keys():
+			pointsValues = xml_obj.attributes['bbox'].value.split(',')
+			return np.array([ float(pointsValues[2]), float(pointsValues[3]) ]) - np.array([ float(pointsValues[0]), float(pointsValues[1]) ])
+		return np.array([0, 0])
+
+	@staticmethod
+	def calBoxCenter(xml_obj):
+		if 'bbox' in xml_obj.attributes.keys():
+			pointsValues = xml_obj.attributes['bbox'].value.split(',')
+			return ( np.array([ float(pointsValues[2]), float(pointsValues[3]) ]) + np.array([ float(pointsValues[0]), float(pointsValues[1]) ]) )/2
+		return np.array([0, 0])
+
+
+'''
+	PaperPageInfo:
+		which contains the contents within a single page.
+'''
+class PaperPageInfo(Box):
 
 	def __init__(self, page_xml_obj):
 		self.xmlObj = page_xml_obj
-		if 'bbox' in page_xml_obj.attributes.keys():
-			pointsValues = page_xml_obj.attributes['bbox'].value.split(',')
-			boxSize = np.array([ float(pointsValues[2]), float(pointsValues[3]) ]) - np.array([ float(pointsValues[0]), float(pointsValues[1]) ])
-			self.width = boxSize[0]
-			self.height = boxSize[1]
+		boxSize = Box.calBoxSize(page_xml_obj)
+		boxCenter = Box.calBoxCenter(page_xml_obj)
+		if boxSize is not None:
+			if 'id' in page_xml_obj.attributes.keys(): objId = page_xml_obj.attributes['id'].value
+			else: objId = -1
+			super(PaperPageInfo, self).__init__(width=boxSize[0], height=boxSize[1], objId=objId, center=boxCenter)
+
+			textBoxes = page_xml_obj.getElementsByTagName('textbox')
+			self.textBoxes = []
+			for textBox in textBoxes:
+				self.textBoxes.append(TextBox(textBox))
+
 		return
 
-	def getWidth(self):
-		return self.width
+	def getXMLObject(self): return self.xmlObj
 
-	def getHeight(self):
-		return self.height
+	def getTextBoxes(self): return self.textBoxes
 
-	def getSize(self):
-		return np.array([self.width, self.height])
 
-	def getXMLObject(self):
-		return self.xmlObj
+class TextBox(Box):
+
+	def __init__(self, textBox_xml_obj):
+		self.xmlObj = textBox_xml_obj
+		boxSize = Box.calBoxSize(textBox_xml_obj)
+		boxCenter = Box.calBoxCenter(textBox_xml_obj)
+		if boxSize is not None:
+			if 'id' in textBox_xml_obj.attributes.keys(): objId = textBox_xml_obj.attributes['id'].value
+			else: objId = -1
+			super(TextBox, self).__init__(width=boxSize[0], height=boxSize[1], objId=objId, center=boxCenter)
+
+			textLines = textBox_xml_obj.getElementsByTagName('textline')
+			self.textLines = []
+			for textLine in textLines:
+				self.textLines.append(TextLine(textLine))
+
+		return
+
+	def getXMLObject(self): return self.xmlObj
+
+	def getTextLines(self): return self.textLines
+
+
+class TextLine(Box):
+
+	def __init__(self, textLine_xml_obj):
+		self.xmlObj = textLine_xml_obj
+		boxSize = Box.calBoxSize(textLine_xml_obj)
+		boxCenter = Box.calBoxCenter(textLine_xml_obj)
+		if boxSize is not None:
+			if 'id' in textLine_xml_obj.attributes.keys(): objId = textLine_xml_obj.attributes['id'].value
+			else: objId = -1
+			super(TextLine, self).__init__(width=boxSize[0], height=boxSize[1], objId=objId, center=boxCenter)
+
+			texts = textLine_xml_obj.getElementsByTagName('text')
+			self.texts = []
+			for text in texts:
+				self.texts.append(Text(text))
+
+		return
+
+	def getXMLObject(self): return self.xmlObj
+
+	def getTexts(self): return self.texts
+
+
+class Text(Box):
+
+	def __init__(self, text_xml_obj):
+		self.xmlObj = text_xml_obj
+		boxSize = Box.calBoxSize(text_xml_obj)
+		boxCenter = Box.calBoxCenter(text_xml_obj)
+		if boxSize is not None:
+			if 'id' in text_xml_obj.attributes.keys(): objId = text_xml_obj.attributes['id'].value
+			else: objId = -1
+			super(Text, self).__init__(width=boxSize[0], height=boxSize[1], objId=objId, center=boxCenter)
+
+		if 'font' in text_xml_obj.attributes.keys(): self.textFont = text_xml_obj.attributes['font'].value
+		else: self.textFont = ''
+		
+		if 'size' in text_xml_obj.attributes.keys(): self.textSize = text_xml_obj.attributes['size'].value
+		else: self.textSize = ''
+
+		return
+
+	def getXMLObject(self): return self.xmlObj
+
+	def getTextFont(self): return self.textFont
+
+	def getTextSize(self): return self.textSize
+
+
 
 
 
 def getXmlObjects(stringArray):
+	cnt = 0
 	xmlObjArray = []
 	for string in stringArray:
 		xmlObjArray.append(getXmlObject(string))
@@ -53,7 +169,9 @@ def getPages(source):
 	return page
 
 def testpath():
-	return './test-samples/OpticalMusicRecognition/Overview_of_Algorithms_and_Techniques_for_Optical_Music_Recognition.pdf'
+	# return './test-samples/OpticalMusicRecognition/Overview_of_Algorithms_and_Techniques_for_Optical_Music_Recognition.pdf'
+	# return './test-samples/OpticalMusicRecognition/HUMAN-DIRECTED OPTICAL MUSIC RECOGNITION.pdf'
+	return './test-samples/OpticalMusicRecognition/2012ARebeloIJMIR.pdf'
 
 def extractPages(pdfPath, format='txt'):
 	fp = file(pdfPath, 'rb')
