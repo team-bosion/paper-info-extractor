@@ -14,6 +14,8 @@ from xml.dom import minidom
 
 import numpy as np
 
+import string
+
 
 '''
 	Box:
@@ -202,6 +204,7 @@ def extractPages(pdfPath, format='txt'):
 		# Read the text (from the "cursor" to the end)
 		page_text = retstr.read()
 		# Add this page's text to a convenient list
+		page_text = filter(string.printable.__contains__, page_text)
 		pages_text.append(page_text)
 
 	return pages_text
