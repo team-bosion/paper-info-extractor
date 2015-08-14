@@ -70,6 +70,7 @@ class PaperPageInfo(Box):
 			super(PaperPageInfo, self).__init__(width=boxSize[0], height=boxSize[1], objId=objId, center=boxCenter)
 
 			textBoxes = page_xml_obj.getElementsByTagName('textbox')
+			textBoxes = textBoxes[:-(len(textBoxes)/2)]
 			self.textBoxes = []
 			for textBox in textBoxes:
 				self.textBoxes.append(TextBox(textBox))
@@ -79,6 +80,8 @@ class PaperPageInfo(Box):
 	def getXMLObject(self): return self.xmlObj
 
 	def getTextBoxes(self): return self.textBoxes
+
+
 
 
 class TextBox(Box):
@@ -126,6 +129,12 @@ class TextLine(Box):
 
 	def getTexts(self): return self.texts
 
+	def getLineText(self):
+		string = ''
+		for text in self.texts:
+			string += getInnerXml(text.getXMLObject())
+		return string
+
 
 class Text(Box):
 
@@ -153,8 +162,11 @@ class Text(Box):
 	def getTextSize(self): return self.textSize
 
 
-
-
+def getInnerXml(xml_obj):
+	if xml_obj.firstChild is not None:
+		return str(xml_obj.firstChild.nodeValue)
+	else:
+		return ''
 
 def getXmlObjects(stringArray):
 	cnt = 0
@@ -266,6 +278,7 @@ def mergeDictionaries(dic1_org, dic2_org, mode='union'):
 	return dic
 
 def main(argv):
+	sys.exit(1)
 	if len(argv) > 2:
 		dictionary = {}
 		for x in range(len(argv)-1):
