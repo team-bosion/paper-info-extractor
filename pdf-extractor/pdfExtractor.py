@@ -182,10 +182,23 @@ def getPages(source):
 	page = source.getElementsByTagName('page')
 	return page
 
-def testpath():
-	# return './test-samples/OpticalMusicRecognition/Overview_of_Algorithms_and_Techniques_for_Optical_Music_Recognition.pdf'
-	# return './test-samples/OpticalMusicRecognition/HUMAN-DIRECTED OPTICAL MUSIC RECOGNITION.pdf'
-	return './test-samples/OpticalMusicRecognition/2012ARebeloIJMIR.pdf'
+def testpath(idx=0):
+	paths = []
+	paths.append('./test-samples/OpticalMusicRecognition/Overview_of_Algorithms_and_Techniques_for_Optical_Music_Recognition.pdf')
+	paths.append('./test-samples/OpticalMusicRecognition/HUMAN-DIRECTED OPTICAL MUSIC RECOGNITION.pdf')
+	paths.append('./test-samples/OpticalMusicRecognition/2012ARebeloIJMIR.pdf')
+	paths.append('./test-samples/AudioSignalProcessing/Oppenheim-1970_for_March_5.pdf')
+	paths.append('./test-samples/AudioSignalProcessing/Oppenheim-Monasco-PhysRevLett-2013_for_March_12.pdf')
+	paths.append('./test-samples/AudioSignalProcessing/BoorstynRife-IEEE-TransInfoTheory_for_March_19.pdf')
+	paths.append('./test-samples/AudioSignalProcessing/11[jstsp]Signal Processing for Music Analysis_April_11.pdf')
+	paths.append('./test-samples/AudioSignalProcessing/AllenBerkley79_for_Feb_26.pdf')
+	paths.append('./test-samples/Articles/1302.4862v1 copy.pdf')
+	paths.append('./test-samples/Articles/Beyond molecules self assembly of mesoscopic and macroscopic components copy.pdf')
+	paths.append('./test-samples/Articles/A synthetic nanomaterial for virus recognition produced by surface imprinting copy.pdf')
+
+	if idx not in range(len(paths)): idx = len(paths)-1
+
+	return paths[idx]
 
 def extractPages(pdfPath, format='txt'):
 	fp = file(pdfPath, 'rb')
