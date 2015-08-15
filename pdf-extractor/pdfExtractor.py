@@ -163,6 +163,12 @@ class Text(Box):
 	def getTextSize(self): return self.textSize
 
 
+def getInfo(path):
+	info['title'] = ''
+	info['authors'] = []
+	info['publisher'] = ''
+	return info
+
 def getTitleStringCandidates(path):
 	title_candidates = getTitleCandidates(path)
 	title_string_array = []
@@ -224,9 +230,9 @@ def getTitleCandidates(path):
 			if len(yfontsizes) > 0: yfontsize = sum(yfontsizes) / float(len(yfontsizes))
 			else: yfontsize = 0
 
-			if xfontsize < yfontsize:
+			if xfontsize < yfontsize or (xfontsize == yfontsize and xcand.getBoxCenter()[1] < ycand.getBoxCenter()[1]):
 				titlecandidates[x] = ycand
-				titlecandidates[y+x+1] = xcand 
+				titlecandidates[y+x+1] = xcand
 
 	return titlecandidates
 
