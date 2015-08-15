@@ -13,6 +13,7 @@ from nltk.stem.lancaster import LancasterStemmer
 from xml.dom import minidom
 
 import numpy as np
+import math
 
 import string
 
@@ -162,6 +163,61 @@ class Text(Box):
 	def getTextSize(self): return self.textSize
 
 
+def getTitleStringCandidates(path):
+	title_candidates = getTitleCandidates(path)
+	title_string_array = []
+	for titlebox in title_candidates:
+		string = ''
+		for titlebox_line in titlebox.getTextLines():
+			string += titlebox_line.getLineText()
+		title_string_array.append(string)
+
+	return title_string_array
+
+def getTitleCandidates(path):
+	first_page_xml = extractPagesXml(path)[0]
+	page_obj = getXmlObject(first_page_xml)
+	page = PaperPageInfo(getPages(page_obj)[0])
+	textboxes = page.getTextBoxes()
+
+	titlecandidates = []
+	tol = 50
+	pagecenterX = page.getBoxCenter()[0]
+	
+	for textbox in textboxes:
+		if len(textbox.getTextLines()) > 3:
+			continue
+		needsort = False
+		if abs(textbox.getBoxCenter()[0] - pagecenterX) < tol or len(titlecandidates) == 0:
+			titlecandidates.append(textbox)
+			needsort = True
+		else:
+			if abs(textbox.getBoxCenter()[0] - pagecenterX) < abs(titlecandidates[0].getBoxCenter()[0] - pagecenterX):
+				titlecandidates[0] = textbox
+				needsort = True
+        
+		if len(titlecandidates) > 1 and needsort:
+			firstcandidate = titlecandidates[0]
+			for x in range(len(titlecandidates)):
+				if x == 0:
+					continue
+				if abs(titlecandidates[x].getBoxCenter()[0] - pagecenterX) > abs(firstcandidate.getBoxCenter()[0] - pagecenterX):
+					titlecandidates[0] = titlecandidates[x]
+					titlecandidates[x] = firstcandidate
+					firstcandidate = titlecandidates[0]
+
+	for x in range(len(titlecandidates)-1):
+		for y in range(len(titlecandidates)-x-1):
+			xcand = titlecandidates[x]
+			ycand = titlecandidates[y+x+1]
+			if abs(xcand.getBoxCenter()[0] - pagecenterX) > abs(ycand.getBoxCenter()[0] - pagecenterX):
+				titlecandidates[x] = ycand
+				titlecandidates[y+x+1] = xcand
+
+	return titlecandidates
+
+
+
 def getInnerXml(xml_obj):
 	if xml_obj.firstChild is not None:
 		return str(xml_obj.firstChild.nodeValue)
@@ -195,6 +251,7 @@ def testpath(idx=0):
 	paths.append('./test-samples/Articles/1302.4862v1 copy.pdf')
 	paths.append('./test-samples/Articles/Beyond molecules self assembly of mesoscopic and macroscopic components copy.pdf')
 	paths.append('./test-samples/Articles/A synthetic nanomaterial for virus recognition produced by surface imprinting copy.pdf')
+	paths.append('./test-samples/Articles/1302.4102v1 copy.pdf')
 
 	if idx not in range(len(paths)): idx = len(paths)-1
 
