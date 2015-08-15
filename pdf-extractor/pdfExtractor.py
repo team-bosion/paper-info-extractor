@@ -210,9 +210,23 @@ def getTitleCandidates(path):
 		for y in range(len(titlecandidates)-x-1):
 			xcand = titlecandidates[x]
 			ycand = titlecandidates[y+x+1]
-			if abs(xcand.getBoxCenter()[0] - pagecenterX) > abs(ycand.getBoxCenter()[0] - pagecenterX):
+
+			xfontsizes = []
+			yfontsizes = []
+			for textline in xcand.getTextLines():
+				size = textline.getTexts()[0].getTextSize()
+				if float(size) > 0: xfontsizes.append(float(size))
+			for textline in ycand.getTextLines():
+				size = textline.getTexts()[0].getTextSize()
+				if float(size) > 0: yfontsizes.append(float(size))
+			if len(xfontsizes) > 0: xfontsize = sum(xfontsizes) / float(len(xfontsizes))
+			else: xfontsize = 0
+			if len(yfontsizes) > 0: yfontsize = sum(yfontsizes) / float(len(yfontsizes))
+			else: yfontsize = 0
+
+			if xfontsize < yfontsize:
 				titlecandidates[x] = ycand
-				titlecandidates[y+x+1] = xcand
+				titlecandidates[y+x+1] = xcand 
 
 	return titlecandidates
 
