@@ -42,3 +42,6 @@
 
 ### `pdfExtractor.getTitleStringCandidates(path={PATH})`
 - return string array.
+
+### `pdfExtractor.getInfo(path={PATH})`
+- return a dictionary contains attributes 'title', 'authors', and 'publisher'

@@ -164,21 +164,49 @@ class Text(Box):
 
 
 def getInfo(path):
+	info = {}
 	info['title'] = ''
 	info['authors'] = []
 	info['publisher'] = ''
+
+	title_candidates = getTitleStringCandidates(path)
+	if len(title_candidates) > 0:
+		info['title'] = title_candidates[0]
+
 	return info
 
 def getTitleStringCandidates(path):
 	title_candidates = getTitleCandidates(path)
-	title_string_array = []
-	for titlebox in title_candidates:
-		string = ''
-		for titlebox_line in titlebox.getTextLines():
-			string += titlebox_line.getLineText()
-		title_string_array.append(string)
+	title_aggred = []
+	str_to_assert = ''
 
-	return title_string_array
+	for x in range(len(title_candidates)):
+		needassert = True
+		cur_cand = title_candidates[x]
+
+		if len(cur_cand.getTextLines()) > 0 and len(cur_cand.getTextLines()[0].getTexts()) > 0:
+			cur_text_size = cur_cand.getTextLines()[0].getTexts()[0].getTextSize()
+			cur_text_font = cur_cand.getTextLines()[0].getTexts()[0].getTextFont()
+		else:
+			cur_text_size = ''
+			cur_text_font = ''
+
+		if str_to_assert == '':
+			for titleline in cur_cand.getTextLines(): str_to_assert += titleline.getLineText()
+
+		if x < len(title_candidates)-1:
+			nxt_cand = title_candidates[x+1]
+			if len(nxt_cand.getTextLines()) > 0 and len(nxt_cand.getTextLines()[0].getTexts()) > 0:
+				first_text = nxt_cand.getTextLines()[0].getTexts()[0]
+				if first_text.getTextSize() == cur_text_size and first_text.getTextFont() == cur_text_font:
+					for titleline in nxt_cand.getTextLines(): str_to_assert += titleline.getLineText()
+					needassert = False
+
+		if needassert:
+			title_aggred.append(str_to_assert)
+			str_to_assert = ''
+
+	return title_aggred
 
 def getTitleCandidates(path):
 	first_page_xml = extractPagesXml(path)[0]
