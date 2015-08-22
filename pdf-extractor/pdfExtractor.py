@@ -16,6 +16,9 @@ import numpy as np
 import math
 
 import string
+import re
+
+import functools
 
 
 '''
@@ -24,11 +27,24 @@ import string
 '''
 class Box(object):
 
-	def __init__(self, width, height, center=np.array([0, 0]), objId=-1):
-		self.id = objId
-		self.width = width
-		self.height = height
-		self.center = center
+	def __init__(self, xml_obj):
+		self.xmlObj = xml_obj
+		self.width = -1
+		self.height = -1
+		self.objId = -1
+		self.center = np.array([-1, -1])
+
+		boxSize = self.calBoxSize(xml_obj)
+		boxCenter = self.calBoxCenter(xml_obj)
+		if boxSize is not None:
+			objId = -1
+			if xml_obj.attributes:
+				if 'id' in xml_obj.attributes.keys(): objId = xml_obj.attributes['id'].value
+
+			self.width = boxSize[0]
+			self.height = boxSize[1]
+			self.objId = objId
+			self.center = boxCenter
 
 	def getWidth(self): return self.width
 
@@ -36,9 +52,11 @@ class Box(object):
 
 	def getBoxCenter(self): return self.center
 
-	def getId(self): return self.id
+	def getId(self): return self.objId
 
 	def getBoxSize(self): return np.array([self.getWidth(), self.getHeight()])
+
+	def getXMLObject(self): return self.xmlObj
 
 	@staticmethod
 	def calBoxSize(xml_obj):
@@ -55,251 +73,238 @@ class Box(object):
 		return np.array([0, 0])
 
 
-'''
-	PaperPageInfo:
-		which contains the contents within a single page.
-'''
-class PaperPageInfo(Box):
-
-	def __init__(self, page_xml_obj):
-		self.xmlObj = page_xml_obj
-		boxSize = Box.calBoxSize(page_xml_obj)
-		boxCenter = Box.calBoxCenter(page_xml_obj)
-		if boxSize is not None:
-			if 'id' in page_xml_obj.attributes.keys(): objId = page_xml_obj.attributes['id'].value
-			else: objId = -1
-			super(PaperPageInfo, self).__init__(width=boxSize[0], height=boxSize[1], objId=objId, center=boxCenter)
-
-			textBoxes = page_xml_obj.getElementsByTagName('textbox')
-			textBoxes = textBoxes[:-(len(textBoxes)/2)]
-			self.textBoxes = []
-			for textBox in textBoxes:
-				self.textBoxes.append(TextBox(textBox))
-
-		return
-
-	def getXMLObject(self): return self.xmlObj
-
-	def getTextBoxes(self): return self.textBoxes
-
-
-
-
-class TextBox(Box):
-
-	def __init__(self, textBox_xml_obj):
-		self.xmlObj = textBox_xml_obj
-		boxSize = Box.calBoxSize(textBox_xml_obj)
-		boxCenter = Box.calBoxCenter(textBox_xml_obj)
-		if boxSize is not None:
-			if 'id' in textBox_xml_obj.attributes.keys(): objId = textBox_xml_obj.attributes['id'].value
-			else: objId = -1
-			super(TextBox, self).__init__(width=boxSize[0], height=boxSize[1], objId=objId, center=boxCenter)
-
-			textLines = textBox_xml_obj.getElementsByTagName('textline')
-			self.textLines = []
-			for textLine in textLines:
-				self.textLines.append(TextLine(textLine))
-
-		return
-
-	def getXMLObject(self): return self.xmlObj
-
-	def getTextLines(self): return self.textLines
-
-
-class TextLine(Box):
-
-	def __init__(self, textLine_xml_obj):
-		self.xmlObj = textLine_xml_obj
-		boxSize = Box.calBoxSize(textLine_xml_obj)
-		boxCenter = Box.calBoxCenter(textLine_xml_obj)
-		if boxSize is not None:
-			if 'id' in textLine_xml_obj.attributes.keys(): objId = textLine_xml_obj.attributes['id'].value
-			else: objId = -1
-			super(TextLine, self).__init__(width=boxSize[0], height=boxSize[1], objId=objId, center=boxCenter)
-
-			texts = textLine_xml_obj.getElementsByTagName('text')
-			self.texts = []
-			for text in texts:
-				self.texts.append(Text(text))
-
-		return
-
-	def getXMLObject(self): return self.xmlObj
-
-	def getTexts(self): return self.texts
-
-	def getLineText(self):
-		string = ''
-		for text in self.texts:
-			string += getInnerXml(text.getXMLObject())
-		return string
-
-
 class Text(Box):
 
 	def __init__(self, text_xml_obj):
-		self.xmlObj = text_xml_obj
-		boxSize = Box.calBoxSize(text_xml_obj)
-		boxCenter = Box.calBoxCenter(text_xml_obj)
-		if boxSize is not None:
-			if 'id' in text_xml_obj.attributes.keys(): objId = text_xml_obj.attributes['id'].value
-			else: objId = -1
-			super(Text, self).__init__(width=boxSize[0], height=boxSize[1], objId=objId, center=boxCenter)
+		super(Text, self).__init__(text_xml_obj)
+		self.textFont = ''
+		self.textSize = -1
+		if text_xml_obj.attributes:
+			if 'font' in text_xml_obj.attributes.keys(): self.textFont = text_xml_obj.attributes['font'].value
+		if text_xml_obj.attributes:
+			if 'size' in text_xml_obj.attributes.keys():
+				try: self.textSize = text_xml_obj.attributes['size'].value
+				except: self.textSize = -1
 
-		if 'font' in text_xml_obj.attributes.keys(): self.textFont = text_xml_obj.attributes['font'].value
-		else: self.textFont = ''
-		
-		if 'size' in text_xml_obj.attributes.keys(): self.textSize = text_xml_obj.attributes['size'].value
-		else: self.textSize = ''
-
-		return
-
-	def getXMLObject(self): return self.xmlObj
 
 	def getTextFont(self): return self.textFont
 
 	def getTextSize(self): return self.textSize
 
-
-def getInfo(path):
-	info = {}
-	info['title'] = ''
-	info['authors'] = []
-	info['publisher'] = ''
-
-	title_candidates = getTitleStringCandidates(path)
-	if len(title_candidates) > 0:
-		info['title'] = title_candidates[0]
-
-	return info
-
-def getTitleStringCandidates(path):
-	title_candidates = getTitleCandidates(path)
-	title_aggred = []
-	str_to_assert = ''
-
-	for x in range(len(title_candidates)):
-		needassert = True
-		cur_cand = title_candidates[x]
-
-		if len(cur_cand.getTextLines()) > 0 and len(cur_cand.getTextLines()[0].getTexts()) > 0:
-			cur_text_size = cur_cand.getTextLines()[0].getTexts()[0].getTextSize()
-			cur_text_font = cur_cand.getTextLines()[0].getTexts()[0].getTextFont()
+	def getInnerXml(self):
+		if self.xmlObj.firstChild is not None:
+			return str(self.xmlObj.firstChild.nodeValue)
 		else:
-			cur_text_size = ''
-			cur_text_font = ''
+			return ''
 
-		if str_to_assert == '':
-			for titleline in cur_cand.getTextLines(): str_to_assert += titleline.getLineText()
+class TextLine(Box):
 
-		if x < len(title_candidates)-1:
-			nxt_cand = title_candidates[x+1]
-			if len(nxt_cand.getTextLines()) > 0 and len(nxt_cand.getTextLines()[0].getTexts()) > 0:
-				first_text = nxt_cand.getTextLines()[0].getTexts()[0]
-				if first_text.getTextSize() == cur_text_size and first_text.getTextFont() == cur_text_font:
-					for titleline in nxt_cand.getTextLines(): str_to_assert += titleline.getLineText()
-					needassert = False
+	def __init__(self, textLine_xml_obj):
+		super(TextLine, self).__init__(textLine_xml_obj)
+		texts = textLine_xml_obj.getElementsByTagName('text')
+		self.texts = map(Text, texts)
 
-		if needassert:
-			title_aggred.append(str_to_assert)
-			str_to_assert = ''
-
-	return title_aggred
-
-def getTitleCandidates(path):
-	first_page_xml = extractPagesXml(path)[0]
-	page_obj = getXmlObject(first_page_xml)
-	page = PaperPageInfo(getPages(page_obj)[0])
-	textboxes = page.getTextBoxes()
-
-	titlecandidates = []
-	tol = 50
-	pagecenterX = page.getBoxCenter()[0]
-	
-	for textbox in textboxes:
-		if len(textbox.getTextLines()) > 3:
-			continue
-		needsort = False
-		if abs(textbox.getBoxCenter()[0] - pagecenterX) < tol or len(titlecandidates) == 0:
-			titlecandidates.append(textbox)
-			needsort = True
+	def getTexts(self): return self.texts
+    
+	def getAvgFontSize(self):
+		if len(self.texts) > 0:
+			fontsizes = map(lambda text: float(text.getTextSize()), self.texts)
+			fontsizes = filter(lambda x: x > 0, fontsizes)
+			return float(int( sum(fontsizes) / len(fontsizes) * 1000 )) / 1000
 		else:
-			if abs(textbox.getBoxCenter()[0] - pagecenterX) < abs(titlecandidates[0].getBoxCenter()[0] - pagecenterX):
-				titlecandidates[0] = textbox
-				needsort = True
+			return -1
+
+	def getLineText(self):
+		strings = map(lambda text: text.getInnerXml(), self.texts)
+		return reduce(lambda x,y: x+y, strings)
+
+
+class TextBox(Box):
+
+	def __init__(self, textBox_xml_obj):
+		super(TextBox, self).__init__(textBox_xml_obj)
+		textLines = textBox_xml_obj.getElementsByTagName('textline')
+		self.textLines = map(TextLine, textLines)
+
+	def getTextLines(self): return self.textLines
+    
+	def getAvgFontSize(self):
+		if len(self.textLines) > 0:
+			fontsizes = map(lambda textline: float(textline.getAvgFontSize()), self.textLines)
+			fontsizes = filter(lambda x: x > 0, fontsizes)
+			return float(int( sum(fontsizes) / len(fontsizes) * 1000 )) / 1000
+		else:
+			return -1
         
-		if len(titlecandidates) > 1 and needsort:
-			firstcandidate = titlecandidates[0]
-			for x in range(len(titlecandidates)):
-				if x == 0:
-					continue
-				if abs(titlecandidates[x].getBoxCenter()[0] - pagecenterX) > abs(firstcandidate.getBoxCenter()[0] - pagecenterX):
-					titlecandidates[0] = titlecandidates[x]
-					titlecandidates[x] = firstcandidate
-					firstcandidate = titlecandidates[0]
+	def merge_box(self, box):
+		map(lambda x: self.textLines.append(x), box.getTextLines())
 
-	for x in range(len(titlecandidates)-1):
-		for y in range(len(titlecandidates)-x-1):
-			xcand = titlecandidates[x]
-			ycand = titlecandidates[y+x+1]
-
-			xfontsizes = []
-			yfontsizes = []
-			for textline in xcand.getTextLines():
-				size = textline.getTexts()[0].getTextSize()
-				if float(size) > 0: xfontsizes.append(float(size))
-			for textline in ycand.getTextLines():
-				size = textline.getTexts()[0].getTextSize()
-				if float(size) > 0: yfontsizes.append(float(size))
-			if len(xfontsizes) > 0: xfontsize = sum(xfontsizes) / float(len(xfontsizes))
-			else: xfontsize = 0
-			if len(yfontsizes) > 0: yfontsize = sum(yfontsizes) / float(len(yfontsizes))
-			else: yfontsize = 0
-
-			if xfontsize < yfontsize or (xfontsize == yfontsize and xcand.getBoxCenter()[1] < ycand.getBoxCenter()[1]):
-				titlecandidates[x] = ycand
-				titlecandidates[y+x+1] = xcand
-
-	return titlecandidates
+	def toString(self): return reduce( lambda x,y: x+y , map(lambda x: x.getLineText(), self.textLines) );
 
 
+'''
+	Page:
+		which contains the contents within a single page.
+'''
+class Page(Box):
 
-def getInnerXml(xml_obj):
-	if xml_obj.firstChild is not None:
-		return str(xml_obj.firstChild.nodeValue)
-	else:
-		return ''
+	def __init__(self, page_xml_obj):
+		super(Page, self).__init__(page_xml_obj)
+		textBoxes = page_xml_obj.getElementsByTagName('textbox')
+		textBoxes = textBoxes[:-(len(textBoxes)/2)]
+		self.textBoxes = map(TextBox, textBoxes)
 
-def getXmlObjects(stringArray):
-	cnt = 0
-	xmlObjArray = []
-	for string in stringArray:
-		xmlObjArray.append(getXmlObject(string))
-	return xmlObjArray
+	def getTextBoxes(self): return self.textBoxes
 
-def getXmlObject(string):
-	return minidom.parseString(string)
 
-def getPages(source):
-	page = source.getElementsByTagName('page')
-	return page
+'''
+	PaperInfo
+'''
+class PaperInfo(object):
+
+	def __init__(self, pdf_path=None):
+		self.titles = []
+		self.authors = []
+		self.publisher = ''
+
+		if pdf_path:
+			fp = file(pdf_path, 'rb')
+			rsrcmgr = PDFResourceManager()
+			retstr = StringIO()
+			codec = 'utf-8'
+			laparams = LAParams()
+			device = XMLConverter(rsrcmgr, retstr, codec=codec, laparams=laparams)
+			interpreter = PDFPageInterpreter(rsrcmgr, device)
+			pages_iterator = PDFPage.get_pages(fp)
+
+			first_page = None
+			for page in pages_iterator:
+				read_position = retstr.tell()
+				interpreter.process_page(page)
+				retstr.seek(read_position, 0)
+				first_page = retstr.read()
+				first_page = filter(string.printable.__contains__, first_page)
+				break
+
+			if not first_page: pass
+
+			first_page_xml = minidom.parseString(first_page).getElementsByTagName('page')[0]
+			title_page = Page(first_page_xml)
+
+			centerX = title_page.getBoxCenter()[0]
+			textboxes = title_page.getTextBoxes()
+			might_be_title = map(functools.partial(self._might_be_title, page_centerX=centerX), textboxes)
+			title_cands = filter(lambda x: x[0], zip(might_be_title, textboxes))
+			title_cands = map(lambda x: x[1], title_cands)
+
+			title_cands = self._aggregate(title_cands)
+			title_cands = self._post_filter(title_cands)
+
+			title_cands = self._sorted(title_cands)
+
+			if len(title_cands) > 0:
+				self.titles = map(lambda title_cand: title_cand.toString(), title_cands)
+
+
+	def _is_aligned_center_or_edge(self, box_obj=None, tol=0, page_centerX=0):
+		if box_obj:
+			if abs(box_obj.getBoxCenter()[0] - page_centerX) < tol: return True
+			if abs(box_obj.getBoxCenter()[0] - box_obj.getBoxSize()[0]/2) < tol: return True
+			if abs(box_obj.getBoxCenter()[0] + box_obj.getBoxSize()[0]/2 - page_centerX*2) < tol: return True
+
+		return False
+
+	def _might_be_title(self, textbox, page_centerX):
+		if not textbox: return False
+		if len(textbox.getTextLines()) > 3: return False
+		if not self._is_aligned_center_or_edge(box_obj=textbox, tol=20, page_centerX=page_centerX): return False
+
+		return True
+
+	def _have_same_fontsize_n_fonttype(self, a, b):
+		afont = a.getTextLines()[0].getTexts()[0].getTextFont()
+		bfont = b.getTextLines()[0].getTexts()[0].getTextFont()
+		if afont != bfont: return False
+		if a.getAvgFontSize() != b.getAvgFontSize(): return False
+ 
+		return True
+
+	def _sorted(self, title_cands):
+		# return sorted(title_cands, key=lambda x: x.getAvgFontSize(), reverse=True)
+
+		for x in range(len(title_cands)-1):
+			for y in range(len(title_cands)-x-1):
+				xcand = title_cands[x]
+				ycand = title_cands[x+y+1]
+
+				if xcand.getAvgFontSize() <= xcand.getAvgFontSize():
+					if xcand.getAvgFontSize() < xcand.getAvgFontSize() or xcand.getBoxCenter()[1] < ycand.getBoxCenter()[1]:
+						title_cands[x] = xcand
+						title_cands[x+y+1] = ycand
+
+		return title_cands
+
+	def _aggregate(self, title_cands):
+		if len(title_cands) == 0:
+			return title_cands
+
+		title_cands_aggred = []
+		cnt = 0
+		title_cands_aggred.append(title_cands[cnt])
+		curfontsize = title_cands_aggred[cnt].getAvgFontSize()
+		curfontstyle = title_cands_aggred[cnt].getTextLines()[0].getTexts()[0].getTextFont()
+
+		for x in range(len(title_cands)):
+			if x == 0: continue
+
+			dummyfontsize = title_cands[x].getAvgFontSize()
+			dummyfontstyle = title_cands[x].getTextLines()[0].getTexts()[0].getTextFont()
+
+			if curfontstyle == dummyfontstyle and curfontsize == dummyfontsize:
+				title_cands_aggred[cnt].merge_box(title_cands[x])
+			else:
+				title_cands_aggred.append(title_cands[x])
+				cnt += 1
+				curfontsize = title_cands_aggred[cnt].getAvgFontSize()
+				curfontstyle = title_cands_aggred[cnt].getTextLines()[0].getTexts()[0].getTextFont()
+
+		return title_cands_aggred
+
+	def _post_filter(self, title_cands):
+		condition1 = lambda x: len(re.sub('[^a-zA-Z]+', '', x)) > 30
+		condition2 = lambda x: len(re.sub('[^\.\?\=\+\-]+', '', x)) < 5
+
+		title_cands_filtered = title_cands
+		title_cands_filtered = filter(lambda x: condition1(x.toString()), title_cands_filtered)
+		title_cands_filtered = filter(lambda x: condition2(x.toString()), title_cands_filtered)
+
+		return title_cands_filtered
+
+	def getTitles(self): return self.titles
+
+	def getTitle(self): return self.titles[0]
+
+	def getAuthors(self): return self.authors
+
+	def getPublisher(self): return self.publisher
+
+
 
 def testpath(idx=0):
-	paths = []
-	paths.append('./test-samples/OpticalMusicRecognition/Overview_of_Algorithms_and_Techniques_for_Optical_Music_Recognition.pdf')
-	paths.append('./test-samples/OpticalMusicRecognition/HUMAN-DIRECTED OPTICAL MUSIC RECOGNITION.pdf')
-	paths.append('./test-samples/OpticalMusicRecognition/2012ARebeloIJMIR.pdf')
-	paths.append('./test-samples/AudioSignalProcessing/Oppenheim-1970_for_March_5.pdf')
-	paths.append('./test-samples/AudioSignalProcessing/Oppenheim-Monasco-PhysRevLett-2013_for_March_12.pdf')
-	paths.append('./test-samples/AudioSignalProcessing/BoorstynRife-IEEE-TransInfoTheory_for_March_19.pdf')
-	paths.append('./test-samples/AudioSignalProcessing/11[jstsp]Signal Processing for Music Analysis_April_11.pdf')
-	paths.append('./test-samples/AudioSignalProcessing/AllenBerkley79_for_Feb_26.pdf')
-	paths.append('./test-samples/Articles/1302.4862v1 copy.pdf')
-	paths.append('./test-samples/Articles/Beyond molecules self assembly of mesoscopic and macroscopic components copy.pdf')
-	paths.append('./test-samples/Articles/A synthetic nanomaterial for virus recognition produced by surface imprinting copy.pdf')
-	paths.append('./test-samples/Articles/1302.4102v1 copy.pdf')
+	paths = [
+		'./test-samples/OpticalMusicRecognition/Overview_of_Algorithms_and_Techniques_for_Optical_Music_Recognition.pdf',
+		'./test-samples/OpticalMusicRecognition/HUMAN-DIRECTED OPTICAL MUSIC RECOGNITION.pdf',
+		'./test-samples/OpticalMusicRecognition/2012ARebeloIJMIR.pdf',
+		'./test-samples/AudioSignalProcessing/Oppenheim-1970_for_March_5.pdf',
+		'./test-samples/AudioSignalProcessing/Oppenheim-Monasco-PhysRevLett-2013_for_March_12.pdf',
+		'./test-samples/AudioSignalProcessing/BoorstynRife-IEEE-TransInfoTheory_for_March_19.pdf',
+		'./test-samples/AudioSignalProcessing/11[jstsp]Signal Processing for Music Analysis_April_11.pdf',
+		'./test-samples/AudioSignalProcessing/AllenBerkley79_for_Feb_26.pdf',
+		'./test-samples/Articles/1302.4862v1 copy.pdf',
+		'./test-samples/Articles/Beyond molecules self assembly of mesoscopic and macroscopic components copy.pdf',
+		'./test-samples/Articles/A synthetic nanomaterial for virus recognition produced by surface imprinting copy.pdf',
+		'./test-samples/Articles/1302.4102v1 copy.pdf'
+	]
 
 	if idx not in range(len(paths)): idx = len(paths)-1
 
@@ -344,12 +349,6 @@ def extractPagesXml(pdfPath):
 
 def extractPagesString(pdfPath):
 	return extractPages(pdfPath, format='txt')
-
-def toString(pages_text):
-	string = ''
-	for page_text in pages_text:
-		string += page_text
-	return string
 
 def extractWord(string):
 	raw = string.decode('utf-8')
@@ -396,43 +395,13 @@ def mergeDictionaries(dic1_org, dic2_org, mode='union'):
 	return dic
 
 def main(argv):
-	sys.exit(1)
-	if len(argv) > 2:
-		dictionary = {}
-		for x in range(len(argv)-1):
-			files = []
-			if argv[x+1].endswith('.pdf'): files.append(argv[x+1])
-			else:
-				files = [f for f in os.listdir(argv[x+1]) if f.endswith('.pdf')]
-				for i in range(len(files)):
-					files[i] = argv[x+1] + files[i]
 
-			for path in files:
-				# Print log
-				print('Processing ' + path + '...')
+	info = PaperInfo(testpath())
 
-				# Extract text of the PDF file
-				pages_text = extractPagesString(path)
-	
-				# Convert to string
-				pdfStr = toString(pages_text)
-				pdfStr = str.lower(pdfStr)
-
-				# Split words
-				# if len(dictionary.keys()) == 0: mode = 'union'
-				# else: mode = 'intersection'
-				mode = 'union'
-				dictionary = mergeDictionaries( getUniqueCount( stem( extractWord(pdfStr) ) ), dictionary, mode=mode )
-
-		for key in dictionary.keys():
-			print(key + ": " + str(dictionary[key]))
-		
-	else:
-		path = argv[1]
-		pages_text = extractPagesXml(path)
-
-		# for page in pages_text:
-		print(pages_text[0])
+	print('title: ' + info.getTitle())
+	print('authors: ')
+	print(info.getAuthors())
+	print('publisher: ' + info.getPublisher())
 
 	sys.exit(1)
 
