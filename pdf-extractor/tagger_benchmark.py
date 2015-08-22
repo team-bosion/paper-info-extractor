@@ -6,7 +6,7 @@ import sys
 
 from difflib import SequenceMatcher
 
-from pdfExtractor import getTitleCandidates, getTitleStringCandidates
+from pdfExtractor import PaperInfo
 
 counter = 0
 THRESHOLD = 0.8
@@ -20,11 +20,15 @@ def dummy_get_candidates(path):
 	title_candidates = ['^']
 
 	try:
-		title_candidates = getTitleStringCandidates(path)
+		title_candidates = PaperInfo(path).getTitles()
 	except:
 		title_candidates = ['^']
 		print '\nerror >.^'
-	return title_candidates
+
+	if len(title_candidates) > 0:
+		return title_candidates
+	else:
+		return [ 'fuck' ]
 
 class BenchmarkRunner:
 	def __init__(self, categories):
@@ -34,7 +38,7 @@ class BenchmarkRunner:
 	def _compare(self, pair):
 		result, target = pair
 		try:
-			ratio = SequenceMatcher(None, result, target['title']).ratio()
+			ratio = SequenceMatcher(None, result.upper(), target['title'].upper()).ratio()
 		except:
 			raise
 		return ratio
